@@ -1,0 +1,90 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python -m ml.prepare_data
+    deps:
+    - path: ml/prepare_data.py
+      hash: md5
+      md5: 9d35761da370ff9aae9d48e6a0e4e19c
+      size: 455
+    outs:
+    - path: data/raw
+      hash: md5
+      md5: d751713988987e9331980363e24189ce.dir
+      size: 0
+      nfiles: 0
+  split:
+    cmd: python -m ml.make_split
+    deps:
+    - path: data/raw
+      hash: md5
+      md5: d751713988987e9331980363e24189ce.dir
+      size: 0
+      nfiles: 0
+    - path: ml/make_split.py
+      hash: md5
+      md5: 8da3dd1f417e76255e30a3f53c0971fe
+      size: 690
+    outs:
+    - path: data/splits
+      hash: md5
+      md5: cbfcb5b7fc133a26e28124c840b8a871.dir
+      size: 1712506
+      nfiles: 3
+  features:
+    cmd: python -m ml.build_features
+    deps:
+    - path: data/splits
+      hash: md5
+      md5: cbfcb5b7fc133a26e28124c840b8a871.dir
+      size: 1712506
+      nfiles: 3
+    - path: ml/build_features.py
+      hash: md5
+      md5: 72232b76449c195afeff7e31ea713691
+      size: 630
+    outs:
+    - path: data/features
+      hash: md5
+      md5: b45d2bb33ad645d43519d273c437dfe5.dir
+      size: 1592013
+      nfiles: 2
+  train:
+    cmd: python -m ml.train model=lgbm
+    deps:
+    - path: data/features
+      hash: md5
+      md5: b45d2bb33ad645d43519d273c437dfe5.dir
+      size: 1592013
+      nfiles: 2
+    - path: ml/train.py
+      hash: md5
+      md5: 55156ae6991bb4605e3a863b1207e722
+      size: 2804
+    outs:
+    - path: artifacts/metrics.json
+      hash: md5
+      md5: 101a64ef1680fb172e02dd51ffe2b413
+      size: 208
+    - path: artifacts/model
+      hash: md5
+      md5: cdca268de04d9e96ef1d2fbed24c69f3.dir
+      size: 1509398
+      nfiles: 1
+  infer:
+    cmd: python -m ml.infer
+    deps:
+    - path: artifacts/model
+      hash: md5
+      md5: cdca268de04d9e96ef1d2fbed24c69f3.dir
+      size: 1509398
+      nfiles: 1
+    - path: ml/infer.py
+      hash: md5
+      md5: 152dd657fd26552679f7e0bd50ad9f1b
+      size: 1687
+    outs:
+    - path: artifacts/preds_test.parquet
+      hash: md5
+      md5: 4b55f616f4add0c662f31c08241d27d9
+      size: 89940

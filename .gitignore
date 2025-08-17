@@ -1,0 +1,44 @@
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+.ipynb_checkpoints/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage*
+htmlcov/
+
+# Environments
+.venv/
+.env
+.env.*
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
+# MLflow (local tracking)
+mlflow/
+
+# Artifacts (managed by DVC in this project)
+artifacts/
+
+# Data (managed by DVC stages)
+data/
+
+# DVC internals (cache/temp)
+.dvc/cache/
+.dvc/tmp/
+
+# Logs
+logs/
+outputs/
