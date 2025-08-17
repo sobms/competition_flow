@@ -20,7 +20,7 @@ stages:
     outs:
       - data/features
   train:
-    cmd: python -m ml.train
+    cmd: python -m ml.train model=lgbm
     deps:
       - data/features
       - ml/train.py
@@ -29,7 +29,7 @@ stages:
     metrics:
       - artifacts/metrics.json
   infer:
-    cmd: python -m ml.infer split=test
+    cmd: python -m ml.infer
     deps:
       - artifacts/model
       - ml/infer.py

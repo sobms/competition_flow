@@ -1,7 +1,8 @@
 defaults:
+  - _self_
   - data: flat50m
   - split: time
-  - model: dummy
+  - model: lgbm
   - pipeline: train
 
 seed: 42

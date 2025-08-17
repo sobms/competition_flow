@@ -5,7 +5,7 @@ from hydra import initialize, compose
 
 
 def main() -> None:
-	with initialize(config_path="conf", version_base=None):
+	with initialize(config_path="../conf", version_base=None):
 		cfg = compose(config_name="config")
 	raw_dir = cfg.data.paths.raw_dir
 	os.makedirs(raw_dir, exist_ok=True)

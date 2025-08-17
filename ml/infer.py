@@ -19,6 +19,20 @@ def _load_model(name: str, path: str):
 		raise ValueError(f"Unknown model: {name}")
 
 
+def _resolve_split(cfg: DictConfig) -> str:
+	# Prefer infer.split if provided to avoid group collision
+	infer_section = getattr(cfg, "infer", None)
+	if infer_section is not None:
+		val = getattr(infer_section, "split", None)
+		if isinstance(val, str) and val:
+			return val
+	# Fallback: if cfg.split is a string (not the split group dict)
+	val = getattr(cfg, "split", None)
+	if isinstance(val, str) and val:
+		return val
+	return "test"
+
+
 @hydra.main(config_path="../conf", config_name="config", version_base=None)
 def main(cfg: DictConfig) -> None:
 	paths = DataPaths(
@@ -26,7 +40,7 @@ def main(cfg: DictConfig) -> None:
 		splits_dir=cfg.data.paths.splits_dir,
 		features_dir=cfg.data.paths.features_dir,
 	)
-	split = cfg.get("split", "test")
+	split = _resolve_split(cfg)
 	feat_df = load_split(paths, split)
 	model_dir = os.path.join(cfg.artifacts_dir, "model")
 	model = _load_model(cfg.model.name, model_dir)

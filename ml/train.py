@@ -11,8 +11,6 @@ from ml.core.data import load_raw, make_splits, build_features, DataPaths
 from ml.core.evaluator import Evaluator
 from ml.core.utils import seed_all, setup_mlflow, log_mlflow_params, log_mlflow_metrics
 from ml.models.dummy import DummyModel
-from ml.models.lgbm import LGBMRegressor
-from ml.models.recbole_adapter import RecBoleAdapter
 
 
 def resolve_model_from_cfg(model_cfg: Dict[str, Any]):
@@ -21,8 +19,10 @@ def resolve_model_from_cfg(model_cfg: Dict[str, Any]):
 	if name == "dummy":
 		return DummyModel(**params)
 	elif name == "lgbm":
+		from ml.models.lgbm import LGBMRegressor
 		return LGBMRegressor(**params)
 	elif name == "recbole":
+		from ml.models.recbole_adapter import RecBoleAdapter
 		return RecBoleAdapter(**params)
 	else:
 		raise ValueError(f"Unknown model: {name}")

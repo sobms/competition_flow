@@ -6,7 +6,7 @@ from ml.core.data import load_raw, make_splits, DataPaths
 
 
 def main() -> None:
-	with initialize(config_path="conf", version_base=None):
+	with initialize(config_path="../conf", version_base=None):
 		cfg = compose(config_name="config")
 	paths = DataPaths(
 		raw_dir=cfg.data.paths.raw_dir,

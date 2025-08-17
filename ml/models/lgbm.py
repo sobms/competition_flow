@@ -13,7 +13,8 @@ class LGBMRegressor(BaseModel):
 		self.model: lgb.Booster | None = None
 
 	def fit(self, train_df: pl.DataFrame, valid_df: pl.DataFrame | None = None) -> "LGBMRegressor":
-		feature_cols = [c for c in train_df.columns if c not in {"label"}]
+		exclude_cols = {"label", "played_ratio_pct"}
+		feature_cols = [c for c in train_df.columns if c not in exclude_cols]
 		train = lgb.Dataset(train_df[feature_cols].to_pandas(), label=train_df["label"].to_pandas())
 		valid_sets = []
 		if valid_df is not None:
@@ -24,7 +25,8 @@ class LGBMRegressor(BaseModel):
 
 	def predict(self, df: pl.DataFrame):
 		assert self.model is not None, "Model is not fitted"
-		feature_cols = [c for c in df.columns if c not in {"label"}]
+		exclude_cols = {"label", "played_ratio_pct"}
+		feature_cols = [c for c in df.columns if c not in exclude_cols]
 		return self.model.predict(df[feature_cols].to_pandas())
 
 	def save(self, path: str) -> None:
