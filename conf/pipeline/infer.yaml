@@ -1,0 +1,2 @@
+split: test
+output_path: ${artifacts_dir}/preds/${now:%Y%m%d_%H%M%S}.parquet

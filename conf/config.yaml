@@ -1,0 +1,13 @@
+defaults:
+  - data: flat50m
+  - split: time
+  - model: dummy
+  - pipeline: train
+
+seed: 42
+work_dir: .
+smoke: false
+mlflow:
+  tracking_uri: ${work_dir}/mlflow
+  experiment: competition
+artifacts_dir: ${work_dir}/artifacts

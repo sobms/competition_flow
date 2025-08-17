@@ -1,0 +1,37 @@
+stages:
+  prepare:
+    cmd: python -m ml.prepare_data
+    deps:
+      - ml/prepare_data.py
+    outs:
+      - data/raw
+  split:
+    cmd: python -m ml.make_split
+    deps:
+      - data/raw
+      - ml/make_split.py
+    outs:
+      - data/splits
+  features:
+    cmd: python -m ml.build_features
+    deps:
+      - data/splits
+      - ml/build_features.py
+    outs:
+      - data/features
+  train:
+    cmd: python -m ml.train
+    deps:
+      - data/features
+      - ml/train.py
+    outs:
+      - artifacts/model
+    metrics:
+      - artifacts/metrics.json
+  infer:
+    cmd: python -m ml.infer split=test
+    deps:
+      - artifacts/model
+      - ml/infer.py
+    outs:
+      - artifacts/preds_test.parquet

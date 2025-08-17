@@ -1,0 +1,4 @@
+name: recbole
+params:
+  model: BPR  # e.g., BPR, NeuMF, SASRec, LightGCN
+  config_overrides: {}
