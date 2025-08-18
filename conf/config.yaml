@@ -2,7 +2,7 @@ defaults:
   - _self_
   - data: flat50m
   - split: time
-  - model: lgbm
+  - model: recbole
   - pipeline: train
 
 seed: 42

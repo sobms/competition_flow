@@ -20,6 +20,7 @@ htmlcov/
 .venv/
 .env
 .env.*
+poetry.toml
 
 # Packaging
 build/
@@ -39,6 +40,10 @@ data/
 .dvc/cache/
 .dvc/tmp/
 
+# RecBole Tmp
+.recbole_tmp/
+
 # Logs
 logs/
 outputs/
+log_tensorboard/

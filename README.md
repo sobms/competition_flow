@@ -1,5 +1,6 @@
 ## e-cup-ozon ML framework
 
+
 Минимальный каркас для соревнований: единый API моделей, тайм-сплиты и фичи, автоматизированные train/validate/infer, логирование в MLflow, пайплайн через DVC, конфигурация через Hydra.
 
 ### 1) Требования
@@ -13,7 +14,7 @@ cd /Users/m.s.sobolev/e-cup-ozon
 # Рекомендуем локальный venv проекта
 poetry config virtualenvs.in-project true --local
 poetry env use python3.10  # или ваш python3
-# poetry install             # базовые зависимости
+poetry install             # базовые зависимости
 # доп. зависимости для RecBole (опционально)
 poetry install --with recbole
 ```

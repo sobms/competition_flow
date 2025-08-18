@@ -1,4 +1,4 @@
+defaults:
+  - _self_
+  - recbole@params: dcnv2
 name: recbole
-params:
-  model: BPR  # e.g., BPR, NeuMF, SASRec, LightGCN
-  config_overrides: {}

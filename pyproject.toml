@@ -12,7 +12,7 @@ hydra-core = "1.3.2"
 omegaconf = "2.3.0"
 polars = ">=0.20.0"
 pandas = ">=2.2.0"
-numpy = ">=1.26.0"
+numpy = ">=1.26,<2.0"
 scikit-learn = ">=1.4.0"
 lightgbm = ">=4.3.0"
 mlflow = ">=2.14.0"
@@ -25,7 +25,7 @@ pytest = ">=8.2.0"
 
 [tool.poetry.group.recbole.dependencies]
 recbole = ">=1.2.0"
-torch = ">=2.2.0"
+torch = "2.2.2"
 
 [build-system]
 requires = ["poetry-core>=1.8.0"]

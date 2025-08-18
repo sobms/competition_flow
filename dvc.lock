@@ -28,16 +28,16 @@ stages:
     outs:
     - path: data/splits
       hash: md5
-      md5: cbfcb5b7fc133a26e28124c840b8a871.dir
-      size: 1712506
+      md5: a6bcb0d6b3f74977712a4f779dc2b866.dir
+      size: 1687881
       nfiles: 3
   features:
     cmd: python -m ml.build_features
     deps:
     - path: data/splits
       hash: md5
-      md5: cbfcb5b7fc133a26e28124c840b8a871.dir
-      size: 1712506
+      md5: a6bcb0d6b3f74977712a4f779dc2b866.dir
+      size: 1687881
       nfiles: 3
     - path: ml/build_features.py
       hash: md5
@@ -46,16 +46,16 @@ stages:
     outs:
     - path: data/features
       hash: md5
-      md5: b45d2bb33ad645d43519d273c437dfe5.dir
-      size: 1592013
+      md5: 11692040f926f32cd18530d782ecc96d.dir
+      size: 1568848
       nfiles: 2
   train:
     cmd: python -m ml.train model=lgbm
     deps:
     - path: data/features
       hash: md5
-      md5: b45d2bb33ad645d43519d273c437dfe5.dir
-      size: 1592013
+      md5: 11692040f926f32cd18530d782ecc96d.dir
+      size: 1568848
       nfiles: 2
     - path: ml/train.py
       hash: md5
@@ -64,27 +64,27 @@ stages:
     outs:
     - path: artifacts/metrics.json
       hash: md5
-      md5: 101a64ef1680fb172e02dd51ffe2b413
-      size: 208
+      md5: 4c69166572a31087fa08b21cece99c08
+      size: 211
     - path: artifacts/model
       hash: md5
-      md5: cdca268de04d9e96ef1d2fbed24c69f3.dir
-      size: 1509398
+      md5: c5f284c852f97a73493527b2dfa2ba3a.dir
+      size: 2335825
       nfiles: 1
   infer:
-    cmd: python -m ml.infer
+    cmd: python -m ml.infer model=lgbm
     deps:
     - path: artifacts/model
       hash: md5
-      md5: cdca268de04d9e96ef1d2fbed24c69f3.dir
-      size: 1509398
+      md5: c5f284c852f97a73493527b2dfa2ba3a.dir
+      size: 2335825
       nfiles: 1
     - path: ml/infer.py
       hash: md5
-      md5: 152dd657fd26552679f7e0bd50ad9f1b
-      size: 1687
+      md5: 45f63c406b921458159708e7a3d619e4
+      size: 1800
     outs:
     - path: artifacts/preds_test.parquet
       hash: md5
-      md5: 4b55f616f4add0c662f31c08241d27d9
-      size: 89940
+      md5: 2a52d2a3382e18052225b00a756e2c48
+      size: 66495

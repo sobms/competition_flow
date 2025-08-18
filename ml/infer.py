@@ -8,6 +8,7 @@ import polars as pl
 from ml.core.data import DataPaths, load_split
 from ml.models.dummy import DummyModel
 from ml.models.lgbm import LGBMRegressor
+from ml.models.recbole_adapter import RecBoleAdapter
 
 
 def _load_model(name: str, path: str):
@@ -15,6 +16,8 @@ def _load_model(name: str, path: str):
 		return DummyModel.load(path)
 	elif name == "lgbm":
 		return LGBMRegressor.load(path)
+	elif name == "recbole":
+		return RecBoleAdapter.load(path)
 	else:
 		raise ValueError(f"Unknown model: {name}")
 

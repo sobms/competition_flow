@@ -29,7 +29,7 @@ stages:
     metrics:
       - artifacts/metrics.json
   infer:
-    cmd: python -m ml.infer
+    cmd: python -m ml.infer model=lgbm
     deps:
       - artifacts/model
       - ml/infer.py
