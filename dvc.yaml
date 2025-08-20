@@ -1,35 +1,32 @@
 stages:
-  prepare:
-    cmd: python -m ml.prepare_data
-    deps:
-      - ml/prepare_data.py
-    outs:
-      - data/raw
   split:
     cmd: python -m ml.make_split
     deps:
-      - data/raw
+      - data/raw_data
       - ml/make_split.py
+      - conf/split/config.yaml
     outs:
       - data/splits
-  features:
-    cmd: python -m ml.build_features
-    deps:
-      - data/splits
-      - ml/build_features.py
-    outs:
-      - data/features
+  # features:
+  #   cmd: python -m ml.build_features
+  #   deps:
+  #     - data/splits
+  #     - ml/build_features.py
+  #   outs:
+  #     - data/features
   train:
-    cmd: python -m ml.train model=lgbm
+    cmd: python -m ml.train
     deps:
-      - data/features
+      - data/splits
       - ml/train.py
+      - conf/train.yaml
+      - conf/config.yaml
     outs:
       - artifacts/model
     metrics:
       - artifacts/metrics.json
   infer:
-    cmd: python -m ml.infer model=lgbm
+    cmd: python -m ml.infer
     deps:
       - artifacts/model
       - ml/infer.py

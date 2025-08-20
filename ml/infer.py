@@ -1,58 +1,68 @@
 from __future__ import annotations
 import os
-from typing import Any
+from pathlib import Path
+from typing import Any, Dict, Callable, List
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import polars as pl
+from datetime import datetime
 
-from ml.core.data import DataPaths, load_split
-from ml.models.dummy import DummyModel
-from ml.models.lgbm import LGBMRegressor
-from ml.models.recbole_adapter import RecBoleAdapter
+# Adapter registry (aligned with train.py)
+from ml.models.als import ALSAdapter
 
+ADAPTERS: Dict[str, Callable[..., Any]] = {
+	"als": ALSAdapter,
+}
+TOPK = 100
 
-def _load_model(name: str, path: str):
-	if name == "dummy":
-		return DummyModel.load(path)
-	elif name == "lgbm":
-		return LGBMRegressor.load(path)
-	elif name == "recbole":
-		return RecBoleAdapter.load(path)
-	else:
+def resolve_model_from_cfg(model_cfg: Dict[str, Any]):
+	name = model_cfg.get("name")
+	if name not in ADAPTERS:
 		raise ValueError(f"Unknown model: {name}")
+	return ADAPTERS[name]
 
 
-def _resolve_split(cfg: DictConfig) -> str:
-	# Prefer infer.split if provided to avoid group collision
-	infer_section = getattr(cfg, "infer", None)
-	if infer_section is not None:
-		val = getattr(infer_section, "split", None)
-		if isinstance(val, str) and val:
-			return val
-	# Fallback: if cfg.split is a string (not the split group dict)
-	val = getattr(cfg, "split", None)
-	if isinstance(val, str) and val:
-		return val
-	return "test"
+def _read_test_user_ids(base_dir: Path) -> List[int]:
+	# Scan all parquet files and collect unique user_id
+	lf = pl.scan_parquet(str(base_dir / "**/*.parquet"))
+	users = lf.select(pl.col("user_id")).unique().collect(streaming=True)
+	return users["user_id"].to_list() if users.height else []
+
+
+def _write_submission(recommendations: Dict[int, List[int]], out_csv: Path) -> None:
+	rows = []
+	for user_id, items in recommendations.items():
+		rows.append({
+			"user_id": int(user_id),
+			"item_id_1 item_id_2 ... item_id_100": " ".join(str(i) for i in items),
+		})
+	df = pl.DataFrame(rows)
+	out_csv.parent.mkdir(parents=True, exist_ok=True)
+	df.write_csv(str(out_csv))
 
 
 @hydra.main(config_path="../conf", config_name="config", version_base=None)
 def main(cfg: DictConfig) -> None:
-	paths = DataPaths(
-		raw_dir=cfg.data.paths.raw_dir,
-		splits_dir=cfg.data.paths.splits_dir,
-		features_dir=cfg.data.paths.features_dir,
-	)
-	split = _resolve_split(cfg)
-	feat_df = load_split(paths, split)
+	# Resolve adapter class and load model
+	adapter_cls = resolve_model_from_cfg(OmegaConf.to_container(cfg.model, resolve=True))
 	model_dir = os.path.join(cfg.artifacts_dir, "model")
-	model = _load_model(cfg.model.name, model_dir)
-	preds = model.predict(feat_df)
-	out = feat_df.select(["uid", "item_id"]).with_columns(pl.Series(name="score", values=preds))
-	os.makedirs(cfg.artifacts_dir, exist_ok=True)
-	out_path = os.path.join(cfg.artifacts_dir, f"preds_{split}.parquet")
-	out.write_parquet(out_path)
-	print(f"Predictions written to {out_path}")
+	model = adapter_cls.load(model_dir)
+
+	# Read users from test_for_participants
+	test_base = Path("data/raw_data") / "test_for_participants"
+	users = _read_test_user_ids(test_base)
+	assert users, "[ERROR] No users found in test_for_participants!"
+
+	# Infer
+	preds = model.infer(users, N=TOPK)
+	# Convert to submission: keep only item ids
+	rec_items: Dict[int, List[int]] = {u: [itm for itm, _ in pairs] for u, pairs in preds.items()}
+
+	# Write submission CSV
+	stamp = datetime.now().strftime("%Y%m%d_%H%M")
+	out_csv = Path(cfg.artifacts_dir) / f"submission_{stamp}.csv"
+	_write_submission(rec_items, out_csv)
+	print(f"[infer] Submission written to {out_csv}")
 
 
 if __name__ == "__main__":

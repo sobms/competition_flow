@@ -1,13 +1,11 @@
 defaults:
   - _self_
-  - data: flat50m
-  - split: time
-  - model: recbole
-  - pipeline: train
+  - split
+  - model: als
+  - train
 
 seed: 42
 work_dir: .
-smoke: false
 mlflow:
   tracking_uri: ${work_dir}/mlflow
   experiment: competition

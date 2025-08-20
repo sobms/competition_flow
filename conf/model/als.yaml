@@ -1,0 +1,10 @@
+name: als
+params:
+  factors: 128
+  regularization: 0.01
+  iterations: 20
+  alpha: 1.0
+  num_threads: 0
+  calculate_training_loss: true
+  label_type: delivered
+  k_eval: 100

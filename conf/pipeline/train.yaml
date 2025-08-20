@@ -1,4 +1,0 @@
-mode: train
-save_model: true
-save_metrics: true
-smoke: ${smoke}

@@ -3,11 +3,15 @@
 .idea/
 .vscode/
 .ipynb_checkpoints/
+.poetry/
+.cache/
 
 # Python
 __pycache__/
 *.py[cod]
 *.pyo
+*.ipynb
+*.pyc
 *.pyd
 *.so
 .mypy_cache/

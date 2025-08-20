@@ -1,5 +1,0 @@
-type: time_holdout
-train_end_ts: 150000
-valid_end_ts: 175000
-test_end_ts: 200000
-group_col: uid
