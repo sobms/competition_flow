@@ -1,8 +1,0 @@
-name: lgbm
-params:
-  objective: binary
-  metric: auc
-  num_leaves: 255
-  learning_rate: 0.05
-  num_boost_round: 200
-  early_stopping_rounds: 50

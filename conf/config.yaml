@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - split
-  - model: bpr
+  - model: als
   - train
   - infer
 
