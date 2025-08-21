@@ -7,5 +7,5 @@ params:
   num_threads: 0
   use_gpu: true
   calculate_training_loss: true
-  label_type: delivered
+  label_type: combined
   k_eval: 100
