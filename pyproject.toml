@@ -25,10 +25,14 @@ tqdm = ">=4.66.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.2.0"
+poethepoet = ">=0.24.0"
 
 [tool.poetry.group.recbole.dependencies]
 recbole = ">=1.2.0"
 torch = ">=2.2.0"
+
+[tool.poe.tasks]
+install-implicit-gpu = { shell = "conda install -y -c conda-forge implicit cudatoolkit" }
 
 [build-system]
 requires = ["poetry-core>=1.8.0"]

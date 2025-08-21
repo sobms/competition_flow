@@ -6,13 +6,13 @@ import numpy as np
 import polars as pl
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse import save_npz, load_npz
-from implicit.als import AlternatingLeastSquares
+from implicit.bpr import BayesianPersonalizedRanking
 from tqdm import tqdm
 
 from ml.core.interfaces import BaseModel
 
 
-class ALSAdapter(BaseModel):
+class BPRAdapter(BaseModel):
 	def __init__(self, **params: Any) -> None:
 		super().__init__(**params)
 		self.params = {
@@ -54,18 +54,6 @@ class ALSAdapter(BaseModel):
 			.otherwise(0.0)
 		).cast(pl.Float32)
 
-	@property
-	def combined_label_expr2(self) -> pl.Expr:
-		return (
-			pl.when(pl.col("last_status") == "delivered_orders")
-			.then(1.0)
-			.when(pl.col("action_type") == "to_cart")
-			.then(1.0)
-			.when(pl.col("action_type") == "favorite") 
-			.then(1.0)
-			.otherwise(0.0)
-		).cast(pl.Float32)
-
 	def _label_expr(self, label_type: str) -> pl.Expr:
 		if label_type == "to_cart_and_delivered":
 			return self.label_expr_to_cart_and_delivered
@@ -75,13 +63,11 @@ class ALSAdapter(BaseModel):
 			return self.target_competition_expr
 		if label_type == "combined":
 			return self.combined_label_expr
-		if label_type == "combined2":
-			return self.combined_label_expr2
 		raise ValueError(f"Invalid label type: {label_type}")
 
 	# -------- dataset preparation --------
 	def prepare_dataset(self, train_cfg: Any) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-		"""Build train/valid data for ALS without loading all into memory.
+		"""Build train/valid data for BPR without loading all into memory.
 		Returns:
 		- train_data: {csr, user_map, item_map}
 		- valid_data: {ground_truth: Set[(user_idx,item_idx)], users: List[user_idx]}
@@ -195,7 +181,7 @@ class ALSAdapter(BaseModel):
 
 		n_users = len(self.idx_to_user_id)
 		n_items = len(self.idx_to_item_id)
-		print(f"[train] ALS training with n_users: {n_users}, n_items: {n_items}, positives count: {(df['label'] > 0).sum()}")
+		print(f"[train] BPR training with n_users: {n_users}, n_items: {n_items}, positives count: {(df['label'] > 0).sum()}")
 		coo = coo_matrix((np.array(data, dtype=np.float32), (np.array(rows), np.array(cols))), shape=(n_users, n_items))
 		self.user_item_csr = coo.tocsr()
 
@@ -253,17 +239,21 @@ class ALSAdapter(BaseModel):
 		return train_data, valid_data
 
 	# -------- training --------
-	def fit(self, train_data: Dict[str, Any]) -> "ALSAdapter":
+	def fit(self, train_data: Dict[str, Any]) -> "BPRAdapter":
 		csr: csr_matrix = train_data["csr"]
-		model = AlternatingLeastSquares(
+		model = BayesianPersonalizedRanking(
 			factors=int(self.params.get("factors", 128)),
+			learning_rate=float(self.params.get("learning_rate", 0.01)),
 			regularization=float(self.params.get("regularization", 0.01)),
 			iterations=int(self.params.get("iterations", 30)),
 			use_gpu=bool(self.params.get("use_gpu", False)),
 			num_threads=int(self.params.get("num_threads", 0)),
+			verify_negative_samples=bool(self.params.get("verify_negative_samples", True)),
 		)
-		alpha = float(self.params.get("alpha", 1.0))
-		model.fit(csr * alpha)
+		# BPR игнорирует веса и рассматривает ненулевые как лайк → бинаризуем
+		binary = csr.copy()
+		binary.data = (binary.data > 0).astype(np.float32)
+		model.fit(binary)
 		self.model = model
 		return self
 
@@ -347,8 +337,8 @@ class ALSAdapter(BaseModel):
 			json.dump({"n_users": n_users, "n_items": n_items}, f)
 
 	@classmethod
-	def load(cls, base_path: str) -> "ALSAdapter":
-		from implicit.als import AlternatingLeastSquares
+	def load(cls, base_path: str) -> "BPRAdapter":
+		from implicit.bpr import BayesianPersonalizedRanking
 		from scipy.sparse import csr_matrix as _csr
 		ad = cls()
 		root = Path(base_path)
@@ -357,7 +347,7 @@ class ALSAdapter(BaseModel):
 		if not (root / "user_map.json").exists():
 			candidates = [d for d in root.iterdir() if d.is_dir()]
 			if not candidates:
-				raise FileNotFoundError(f"No saved ALS model directories under {base_path}")
+				raise FileNotFoundError(f"No saved BRP model directories under {base_path}")
 			p = max(candidates, key=lambda d: d.stat().st_mtime)
 		# maps
 		with open(p / "user_map.json") as f:
@@ -376,12 +366,16 @@ class ALSAdapter(BaseModel):
 		if not if_path_items.exists():
 			raise FileNotFoundError("item_factors.npy is missing")
 		vf = np.load(if_path_items)
-		model = AlternatingLeastSquares(
-			factors=128,
+		# factors for BPR GPU include bias term (+1) → восстановим число факторов
+		factors = int(uf.shape[1] - 1) if len(uf.shape) == 2 and uf.shape[1] > 0 else 128
+		model = BayesianPersonalizedRanking(
+			factors=factors,
+			learning_rate=float(self.params.get("learning_rate", 0.01)) if hasattr(self, "params") else 0.01,
 			regularization=0.01,
-			iterations=30,
+			iterations=1,
 			use_gpu=True,
 			num_threads=0,
+			verify_negative_samples=True,
 		)
 		# attach factors directly
 		import implicit.gpu as _igpu

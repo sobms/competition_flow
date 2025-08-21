@@ -1,8 +1,9 @@
 defaults:
   - _self_
   - split
-  - model: als
+  - model: bpr
   - train
+  - infer
 
 seed: 42
 work_dir: .

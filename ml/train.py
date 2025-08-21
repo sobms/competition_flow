@@ -8,11 +8,13 @@ import mlflow
 
 from ml.core.utils import seed_all, setup_mlflow, log_mlflow_params, log_mlflow_metrics
 from ml.models.als import ALSAdapter
+from ml.models.bpr import BPRAdapter
 from ml.core.recsys_metrics import calculate_eval_metrics
 
 # Adapter registry
 ADAPTERS: Dict[str, Callable[..., Any]] = {
 	"als": ALSAdapter,
+	"bpr": BPRAdapter,
 }
 
 

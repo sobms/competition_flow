@@ -1,11 +1,12 @@
-name: als
+name: bpr
 params:
-  factors: 256
+  factors: 512
+  learning_rate: 0.1
   regularization: 0.01
-  iterations: 30
-  alpha: 1.0
+  iterations: 300
   num_threads: 0
   use_gpu: true
+  verify_negative_samples: true
   calculate_training_loss: true
   label_type: delivered
   k_eval: 100
