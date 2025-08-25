@@ -1,0 +1,24 @@
+defaults:
+  - recbole
+
+name: sasrec
+params:
+  hidden_size: 128
+  num_layers: 2
+  num_heads: 2
+  dropout_prob: 0.2
+  attn_dropout_prob: 0.2
+  hidden_dropout_prob: 0.2
+  max_seq_length: 50
+  learning_rate: 0.001
+  epochs: 10
+  train_batch_size: 1024
+  eval_batch_size: 1024
+  # Recbole expects no negative sampling for CE loss in SASRec
+  recbole_config:
+    # log_wandb: true
+    # wandb_project: ecup-ozon
+    # show_progress: true
+    train_neg_sample_args: null
+    eval_neg_sample_args: null
+

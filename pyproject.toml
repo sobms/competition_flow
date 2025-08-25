@@ -22,6 +22,7 @@ pydantic = ">=2.7.0"
 implicit = ">=0.7.0"
 scipy = ">=1.11.0"
 tqdm = ">=4.66.0"
+duckdb = ">=1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.2.0"

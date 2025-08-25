@@ -1,0 +1,31 @@
+defaults:
+  - recbole
+
+name: dssm
+params:
+  # Common DSSM hyperparameters
+  embedding_size: 128
+  learning_rate: 0.001
+  epochs: 10
+  train_batch_size: 1024
+  eval_batch_size: 1024
+
+  # Native RecBole overrides
+  recbole_config:
+    show_progress: true
+    log_level: INFO
+
+    # Use pairwise BPR with negative sampling (typical for two-tower)
+    loss_type: BPR
+    train_neg_sample_args:
+      distribution: uniform
+      sample_num: 1
+    eval_neg_sample_args:
+      distribution: uniform
+      sample_num: 100
+
+    # Optional: enable W&B
+    # log_wandb: true
+    # wandb_project: ecup-ozon
+
+

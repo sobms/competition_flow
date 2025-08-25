@@ -1,0 +1,31 @@
+defaults:
+  - _self_
+
+items_dir: data/raw_data/ml_ozon_recsys_items_data
+
+train:
+  orders_dir: data/splits/train/ml_ozon_recsys_orders_data
+  tracker_dir: data/splits/train/ml_ozon_recsys_tracker_data
+valid:
+  orders_dir: data/splits/valid/ml_ozon_recsys_orders_data
+  tracker_dir: data/splits/valid/ml_ozon_recsys_tracker_data
+
+# Output
+out_root: data/processed_features
+items_out: items_features
+users_out: users_features
+inter_out: inter_features
+shards: 1024
+
+# Performance
+num_workers: 4
+
+# Windows for inter features (past-only)
+windows: [7d, 30d]
+
+# Target config
+target:
+  type: combined   # delivered | combined
+  horizon_days: 0  # 0 = unlimited
+  drop_duplicate_targets: true
+

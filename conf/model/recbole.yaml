@@ -1,0 +1,54 @@
+dataset_name: ozon_ml
+USER_ID_FIELD: user_id
+ITEM_ID_FIELD: item_id
+LABEL_FIELD: target
+TIME_FIELD: date
+
+seed: 12
+inter_write_mode: header_only
+is_sequential: true
+final_features_dir: data/processed_features/final_features
+
+# data dirs
+artifacts_dir: artifacts
+orders_dir: data/raw_data/ml_ozon_recsys_orders_data
+
+items_dir: data/processed_features/items_features
+users_dir: data/processed_features/users_features
+inter_features_dir: data/processed_features/inter_features
+
+# streaming
+stream_batch_size: 32
+stream_num_workers: 0
+
+label_type: combined
+# optional feature columns, used only in streaming loaders
+item_feature_cols:
+  - name: fclip_embed
+    type: float_seq
+  - name: catalogid
+    type: token
+  - name: variant_id
+    type: token
+  - name: model_id
+    type: token
+user_feature_cols: []
+#   - name: age
+#     type: int
+#   - name: region
+#     type: token
+inter_feature_cols:
+  - name: cnt_view_description_sum_30d_past
+    type: int
+  - name: cnt_page_view_sum_30d_past
+    type: int
+  - name: cnt_favorite_sum_30d_past
+    type: int
+  - name: cnt_unfavorite_sum_30d_past
+    type: int
+  - name: cnt_to_cart_sum_30d_past
+    type: int
+  - name: cnt_remove_sum_30d_past
+    type: int
+  - name: cnt_review_view_sum_30d_past
+    type: int

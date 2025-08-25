@@ -7,13 +7,18 @@ stages:
       - conf/split/config.yaml
     outs:
       - data/splits
-  # features:
-  #   cmd: python -m ml.build_features
-  #   deps:
-  #     - data/splits
-  #     - ml/build_features.py
-  #   outs:
-  #     - data/features
+  features:
+    cmd: python -m ml.build_features
+    deps:
+      - data/splits
+      - ml/build_features/__main__.py
+      - ml/build_features/inter.py
+      - ml/build_features/items.py
+      - ml/build_features/base.py
+      - ml/build_features/io.py
+      - conf/build_features.yaml
+    outs:
+      - data/processed_features
   train:
     cmd: python -m ml.train
     deps:
