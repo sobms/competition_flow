@@ -3,9 +3,9 @@ split:
   train_end_ts: 1751328000
   valid_end_ts: 1752624000
   valid_ratio: 0.1          # доля пользователей для time_user_split
-  user_split_mod: 1000      # модуль деления для time_user_split
+  user_split_mod: 800      # модуль деления для time_user_split
   user_split_seed: 17       # смещение для time_user_split
   fast_mode: false
   fast_mode_users_count: 10000
-  only_train_mode: true
+  only_train_mode: false
   num_user_shards: 64

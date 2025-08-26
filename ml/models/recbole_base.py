@@ -119,9 +119,10 @@ class RecBoleBaseAdapter(BaseModel):
             "batch_size": int(self.config.get("stream_batch_size", 1)),
             "num_workers": int(self.config.get("stream_num_workers", 0)),
             "is_sequential": bool(self.config.get("is_sequential", False)),
-            "MAX_ITEM_LIST_LENGTH": int(self.config.get("MAX_ITEM_LIST_LENGTH", 50)),
-            "LIST_SUFFIX": str(self.config.get("LIST_SUFFIX", "_list")),
-            "ITEM_LIST_LENGTH_FIELD": str(self.config.get("ITEM_LIST_LENGTH_FIELD", "item_length")),
+            "MAX_ITEM_LIST_LENGTH": int(self.params.get("MAX_ITEM_LIST_LENGTH", 20)),
+            "LIST_SUFFIX": str(self.params.get("LIST_SUFFIX", "_list")),
+            "ITEM_LIST_LENGTH_FIELD": str(self.params.get("ITEM_LIST_LENGTH_FIELD", "item_length")),
+            "MAX_SEQS_PER_USER": int(self.params.get("MAX_SEQS_PER_USER", 5)),
         }
 
         self.recbole_config = recbole_cfg
@@ -163,9 +164,19 @@ class RecBoleBaseAdapter(BaseModel):
             from recbole.utils import init_seed as _init_seed
             _init_seed(int(config["seed"]), reproducibility)
 
+        # Ensure torch uses CUDA by default if available to avoid CPU/CUDA mismatches
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.set_default_device("cuda")
+        except Exception:
+            pass
+
         # Dataset and loaders
         print(f"[train.fit] Creating dataset")
         dataset = create_dataset(config)
+        # Store dataset for adapters to use during inference (e.g., id mappings)
+        self._dataset = dataset
         streaming_spec = train_data.get("streaming_spec", {}) if isinstance(train_data, dict) else {}
         print(f"[train.fit] Building streaming loaders")
         train_loader = self._build_streaming_loader(dataset, streaming_spec, mode="train")
@@ -183,6 +194,10 @@ class RecBoleBaseAdapter(BaseModel):
             model = tmp_trainer._build_model(config, dataset)
         print(f"[train.fit] Building trainer")
         trainer = Trainer(config, model=model)
+        
+        # Передаем dataset в trainer для корректной работы evaluate
+        trainer._dataset = dataset
+        
         print(f"[train.fit] Fitting model")
         self.model = trainer.fit(train_loader, valid_loader)
         return self
@@ -195,35 +210,11 @@ class RecBoleBaseAdapter(BaseModel):
             pairs = [(iid, float(k - i)) for i, iid in enumerate(self._popular_items[:k])]
             return {int(u): pairs for u in users}
 
-        try:
-            import torch
-        except Exception as e:
-            raise ImportError("torch is required for inference.") from e
+        return self._infer_predictions(users, N)
 
-        # Recbole models typically implement full_sort_predict
-        res: Dict[int, List[Tuple[int, float]]] = {}
-        user_list = list(users)
-        if not user_list:
-            return res
-
-        # Predict one-by-one to avoid coupling with recbole internals
-        with torch.no_grad():
-            for u in user_list:
-                # Most recbole models expect internal user id (index). If external ids were tokens,
-                # additional mapping may be required depending on model/dataset integration.
-                try:
-                    scores = self.model.full_sort_predict(torch.tensor([int(u)], dtype=torch.long)).squeeze(0)
-                    if scores.ndim == 0:
-                        scores = scores.unsqueeze(0)
-                    topk = min(N, scores.numel())
-                    values, indices = torch.topk(scores, k=topk)
-                    res[int(u)] = [(int(indices[i].item()), float(values[i].item())) for i in range(topk)]
-                except Exception:
-                    # Fallback popular
-                    k = min(N, len(self._popular_items))
-                    pairs = [(iid, float(k - i)) for i, iid in enumerate(self._popular_items[:k])]
-                    res[int(u)] = pairs
-        return res
+    # To be overridden by specific adapters (e.g., SASRec)
+    def _infer_predictions(self, users: Iterable[int], N: int) -> Dict[int, List[Tuple[int, float]]]:
+        raise NotImplementedError("Override _infer_predictions in the model adapter (e.g., SASRecAdapter)")
 
     # -------- helpers --------
     def _to_plain_dict(self, cfg: Any) -> Dict[str, Any]:
@@ -391,211 +382,22 @@ class RecBoleBaseAdapter(BaseModel):
     # -------- streaming DataLoader (hybrid) --------
     def _build_streaming_loader(self, dataset: Any, streaming_spec: Dict[str, Any], mode: str):
         try:
-            import torch
-            from torch.utils.data import IterableDataset, DataLoader
-            from recbole.data.interaction import Interaction
+            from torch.utils.data import DataLoader
         except Exception as e:
-            raise ImportError("torch and recbole are required for streaming dataloader.") from e
-
-        user_field = dataset.config["USER_ID_FIELD"]
-        item_field = dataset.config["ITEM_ID_FIELD"]
-        label_field = dataset.config["LABEL_FIELD"]
-        time_field = dataset.config["TIME_FIELD"]
-
-        # token maps from dataset (string token -> internal id)
-        # Prefer field2token_id; if unavailable or array-like, build mapping safely.
-        def _ensure_token_to_id_map(ds: Any, field_name: str) -> Dict[str, int]:
-            # Try the correct mapping first
-            token_to_id = getattr(ds, "field2token_id", {}).get(field_name, None)
-            if hasattr(token_to_id, "get"):
-                return dict(token_to_id)  # type: ignore[arg-type]
-            # Fallback: invert id->token structure
-            id_to_token = getattr(ds, "field2id_token", {}).get(field_name, None)
-            mapping: Dict[str, int] = {}
-            if isinstance(id_to_token, dict):
-                for idx, tok in id_to_token.items():
-                    try:
-                        mapping[str(tok)] = int(idx)
-                    except Exception:
-                        continue
-                return mapping
-            # If it's a sequence/ndarray, enumerate
-            try:
-                for idx, tok in enumerate(id_to_token):  # type: ignore[assignment]
-                    mapping[str(tok)] = int(idx)
-            except Exception:
-                mapping = {}
-            return mapping
-
-        user_map: Dict[str, int] = _ensure_token_to_id_map(dataset, user_field)
-        item_map: Dict[str, int] = _ensure_token_to_id_map(dataset, item_field)
-
-        inter_shards: List[str] = list(
-            streaming_spec.get("train_inter_shards" if mode == "train" else "valid_inter_shards") or []
-        )
-        item_shards: List[str] = list(streaming_spec.get("items_shards") or [])
-        user_shards: List[str] = list(streaming_spec.get("users_shards") or [])
-        item_feature_cols: List[Dict[str, str]] = list(streaming_spec.get("item_feature_cols") or [])
-        user_feature_cols: List[Dict[str, str]] = list(streaming_spec.get("user_feature_cols") or [])
-        inter_feature_cols: List[Dict[str, str]] = list(streaming_spec.get("inter_feature_cols") or [])
-        batch_size: int = int(streaming_spec.get("batch_size", 4096))
+            raise ImportError("torch is required for streaming dataloader.") from e
+        iterable = self._create_streaming_dataset(dataset, streaming_spec, mode)
         num_workers: int = int(streaming_spec.get("num_workers", 0))
-        # Optional: register DuckDB VIEW once (no precompute)
-        is_sequential = bool(streaming_spec.get("is_sequential", False))
-        if item_shards:
-            self._precompute_final_features(
-                inter_shards=inter_shards,
-                item_shards=item_shards,
-                item_field=item_field,
-                item_feature_cols=item_feature_cols
-            )
-        print(f"[train.dataloader] Using DuckDB runtime join for item features")
-        self_outer = self
-        # ----- DuckDB one-time items registration (outside of __iter__) -----
-        duckdb_db_path: str | None = None
-        item_cols: List[str] = [c.get("name") for c in item_feature_cols if c.get("name")]
-        if item_cols:
-            try:
-                import duckdb  # type: ignore
-            except Exception as e:
-                raise ImportError("duckdb is required for runtime item feature join") from e
-            data_path = str(dataset.config["data_path"])  # recbole Config behaves like dict
-            duckdb_dir = Path(data_path) / "duckdb"
-            duckdb_dir.mkdir(parents=True, exist_ok=True)
-            duckdb_db_path = str(duckdb_dir / "items.duckdb")
-            items_files_sql = "[" + ",".join([f"'{p}'" for p in item_shards]) + "]" if item_shards else "[]"
-            con_reg = duckdb.connect(duckdb_db_path)
-            try:
-                sel_items_cols = ", ".join([item_field] + item_cols)
-                con_reg.execute(
-                    f"CREATE OR REPLACE VIEW items_all AS SELECT {sel_items_cols} FROM read_parquet({items_files_sql})"
-                )
-            finally:
-                con_reg.close()
-
-        class _ParquetIterable(IterableDataset):
-            def __iter__(self) -> Iterator[Interaction]:
-                # Local imports
-                import duckdb  # type: ignore
-                import pyarrow as pa  # type: ignore
-                feature_cols_all = [c.get("name") for c in (inter_feature_cols + item_feature_cols + user_feature_cols) if c.get("name")]
-                # Open read-only connection to pre-registered DB if item features are present
-                con = duckdb.connect(duckdb_db_path, read_only=True) if (duckdb_db_path is not None) else None
-                try:
-                    for inter_path in tqdm(inter_shards, desc="Processing inter shards"):
-                        # Build join SQL per interactions shard
-                        if item_cols and con is not None:
-                            sel_item_feats = ", ".join([f"it.{c}" for c in item_cols])
-                            select_list = f"i.*, {sel_item_feats}"
-                            sql = (
-                                f"SELECT {select_list} FROM read_parquet('{inter_path}') i "
-                                f"LEFT JOIN items_all it USING ({item_field})"
-                            )
-                            tb = con.execute(sql).fetch_arrow_table()
-                        else:
-                            import pyarrow.parquet as pq  # type: ignore
-                            tb = pq.read_table(inter_path)
-                        if tb.num_rows == 0:
-                            continue
-                        # iterate in slices to control memory
-                        for start in range(0, tb.num_rows, batch_size):
-                            end = min(start + batch_size, tb.num_rows)
-                            sb: pa.Table = tb.slice(start, end - start)
-                            if sb.num_rows == 0:
-                                continue
-                            # map tokens to internal ids per row; drop unmapped
-                            u_col = sb.column(user_field).to_pandas()
-                            i_col = sb.column(item_field).to_pandas()
-                            keep_idx: List[int] = []
-                            buf_u: List[int] = []
-                            buf_i: List[int] = []
-                            for idx, (u, i) in enumerate(zip(u_col, i_col)):
-                                um = user_map.get(str(int(u))) if u is not None else None
-                                im = item_map.get(str(int(i))) if i is not None else None
-                                if (um is not None) and (im is not None):
-                                    keep_idx.append(idx)
-                                    buf_u.append(um)
-                                    buf_i.append(im)
-                            if not keep_idx:
-                                continue
-                            # labels
-                            if label_field in sb.schema.names:
-                                y_vals = sb.column(label_field).to_pandas().iloc[keep_idx].astype(float).tolist()
-                            else:
-                                y_vals = [0.0] * len(keep_idx)
-                            # gather features by kept indices
-                            buf_feats: Dict[str, List[Any]] = {}
-                            for name in feature_cols_all:
-                                if name in sb.schema.names:
-                                    buf_feats[name] = sb.column(name).to_pandas().iloc[keep_idx].tolist()
-                            # sequential features runtime
-                            feature_cols_runtime = inter_feature_cols + item_feature_cols + user_feature_cols
-                            if is_sequential:
-                                list_suffix = str(streaming_spec.get("LIST_SUFFIX", "_list"))
-                                seq_max_len = int(streaming_spec.get("MAX_ITEM_LIST_LENGTH", 50))
-                                seq_len_field = str(streaming_spec.get("ITEM_LIST_LENGTH_FIELD", "item_length"))
-                                seq_field_name = f"{item_field}{list_suffix}"
-                                lens_kept: List[int] = []
-                                if seq_field_name in sb.schema.names:
-                                    raw_seqs: List[Any] = sb.column(seq_field_name).to_pylist()
-                                    seqs_kept: List[List[int]] = []
-                                    for idx in keep_idx:
-                                        seq_raw = raw_seqs[idx] or []
-                                        mapped = [int(item_map.get(str(int(x)), 0)) for x in seq_raw if x is not None]
-                                        length = min(len(mapped), seq_max_len)
-                                        recent = mapped[-seq_max_len:]
-                                        if len(recent) < seq_max_len:
-                                            recent = [0] * (seq_max_len - len(recent)) + recent
-                                        seqs_kept.append(recent)
-                                        lens_kept.append(length)
-                                    buf_feats[seq_field_name] = seqs_kept
-                                    buf_feats[seq_len_field] = lens_kept
-                                    feature_cols_runtime = feature_cols_runtime + [
-                                        {"name": seq_field_name, "type": "int_seq"},
-                                        {"name": seq_len_field, "type": "int"},
-                                    ]
-                                else:
-                                    # build sequences on the fly within this slice
-                                    u_vals = sb.column(user_field).to_pandas().iloc[keep_idx].astype(int).tolist()
-                                    i_vals_ext = sb.column(item_field).to_pandas().iloc[keep_idx].astype(int).tolist()
-                                    history: Dict[int, List[int]] = {}
-                                    seqs_kept: List[List[int]] = []
-                                    for u_ext, i_ext in zip(u_vals, i_vals_ext):
-                                        hist = history.get(u_ext, [])
-                                        mapped_hist = [int(item_map.get(str(int(x)), 0)) for x in hist]
-                                        length = min(len(mapped_hist), seq_max_len)
-                                        recent = mapped_hist[-seq_max_len:]
-                                        if len(recent) < seq_max_len:
-                                            recent = [0] * (seq_max_len - len(recent)) + recent
-                                        seqs_kept.append(recent)
-                                        lens_kept.append(length)
-                                        history[u_ext] = hist + [i_ext]
-                                    buf_feats[seq_field_name] = seqs_kept
-                                    buf_feats[seq_len_field] = lens_kept
-                                    feature_cols_runtime = feature_cols_runtime + [
-                                        {"name": seq_field_name, "type": "int_seq"},
-                                        {"name": seq_len_field, "type": "int"},
-                                    ]
-                                # drop rows with zero history length to avoid item_seq_len-1 = -1
-                                sel_idx = [i for i, L in enumerate(lens_kept) if L > 0]
-                                if not sel_idx:
-                                    continue
-                                # apply selection to core buffers
-                                buf_u = [buf_u[i] for i in sel_idx]
-                                buf_i = [buf_i[i] for i in sel_idx]
-                                y_vals = [y_vals[i] for i in sel_idx]
-                                # apply selection to all feature lists
-                                for k, v in list(buf_feats.items()):
-                                    if isinstance(v, list) and len(v) == len(lens_kept):
-                                        buf_feats[k] = [v[i] for i in sel_idx]
-                            yield self_outer._make_interaction(user_field, item_field, label_field, buf_u, buf_i, y_vals, buf_feats, feature_cols_runtime)
-                finally:
-                    if con is not None:
-                        con.close()
-
-        iterable = _ParquetIterable()
         print(f"[train.fit] Building dataloader")
-        return DataLoader(iterable, batch_size=None, num_workers=num_workers)
+        dataloader = DataLoader(iterable, batch_size=None, num_workers=num_workers)
+        
+        # Добавляем ссылку на dataset для совместимости с RecBole
+        dataloader._dataset = dataset
+        
+        return dataloader
+
+    # To be overridden by specific adapters (e.g., SASRec)
+    def _create_streaming_dataset(self, dataset: Any, streaming_spec: Dict[str, Any], mode: str):
+        raise NotImplementedError("Override _create_streaming_dataset in the model adapter (e.g., SASRecAdapter)")
 
 
     def _feature_to_python(self, val: Any, ftype: str) -> Any:
@@ -633,10 +435,18 @@ class RecBoleBaseAdapter(BaseModel):
     ):
         import torch
         from recbole.data.interaction import Interaction
+        
+        # Get the device from the model if available
+        device = torch.device('cpu')  # default
+        if self.model is not None and hasattr(self.model, 'device'):
+            device = self.model.device
+        elif torch.cuda.is_available():
+            device = torch.device('cuda')
+            
         batch: Dict[str, Any] = {
-            user_field: torch.tensor(buf_u, dtype=torch.long),
-            item_field: torch.tensor(buf_i, dtype=torch.long),
-            label_field: torch.tensor(buf_y, dtype=torch.float32),
+            user_field: torch.tensor(buf_u, dtype=torch.long, device=device),
+            item_field: torch.tensor(buf_i, dtype=torch.long, device=device),
+            label_field: torch.tensor(buf_y, dtype=torch.float32, device=device),
         }
         for c in feature_cols:
             name = c.get("name")
@@ -648,23 +458,27 @@ class RecBoleBaseAdapter(BaseModel):
                 if vals and all(isinstance(v, list) for v in vals):
                     max_len = max((len(v) for v in vals if isinstance(v, list)), default=0)
                     if max_len > 0 and all(len(v) == max_len for v in vals):
-                        batch[name] = torch.tensor(vals, dtype=torch.float32)
+                        batch[name] = torch.tensor(vals, dtype=torch.float32, device=device)
                 continue
             # Handle integer/token sequences
             if ftype in ("int_seq", "token_seq", "list_int", "int_list"):
                 if vals and all(isinstance(v, list) for v in vals):
                     max_len = max((len(v) for v in vals if isinstance(v, list)), default=0)
                     if max_len > 0 and all(len(v) == max_len for v in vals):
-                        batch[name] = torch.tensor(vals, dtype=torch.long)
+                        batch[name] = torch.tensor(vals, dtype=torch.long, device=device)
                 continue
             if ftype in ("float", "float32", "float64"):
-                batch[name] = torch.tensor([float(x) if x is not None else 0.0 for x in vals], dtype=torch.float32)
+                batch[name] = torch.tensor([float(x) if x is not None else 0.0 for x in vals], dtype=torch.float32, device=device)
             elif ftype in ("int", "i64"):
-                batch[name] = torch.tensor([int(x) if x is not None else 0 for x in vals], dtype=torch.long)
+                batch[name] = torch.tensor([int(x) if x is not None else 0 for x in vals], dtype=torch.long, device=device)
             else:
                 # token / string: keep as list of strings; if needed, a tokenizer can be applied in model-specific adapter
                 # batch[name] = vals
                 continue
-        print(batch.keys())
-        print(f"Tensor size: {batch['item_id_list'].size()}")
-        return Interaction(batch)
+        interaction = Interaction(batch)
+        
+        # Ensure all tensors in the interaction are on the correct device
+        if device.type != 'cpu':
+            interaction = interaction.to(device)
+        
+        return interaction

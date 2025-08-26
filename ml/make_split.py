@@ -62,7 +62,20 @@ def _process_dir(dir_name: str, ts_col: str, split_cfg: Dict[str, Any], users_sl
     only_train_mode = bool(split_cfg.get("only_train_mode", False))
 
     src_glob = RAW_BASE / dir_name / "*.parquet"
-    lf = pl.scan_parquet(str(src_glob))
+    # Read only the columns we need to avoid schema mismatches
+    if dir_name == "ml_ozon_recsys_orders_data":
+        # For orders data, ignore extra columns like 'created_date' and select only the columns we need
+        lf = pl.scan_parquet(str(src_glob), extra_columns='ignore').select([
+            "item_id", "user_id", "created_timestamp", "last_status", "last_status_timestamp"
+        ])
+    elif dir_name == "ml_ozon_recsys_tracker_data":
+        # Ignore extra columns like 'date' that exist in some files but not others
+        lf = pl.scan_parquet(str(src_glob), extra_columns='ignore').select([
+            "action_widget", "item_id", "user_id", "timestamp", "action_type"
+        ])
+    else:
+        print(f"Unknown directory: {dir_name}")
+        lf = pl.scan_parquet(str(src_glob))
     if fast_mode and users_slice_lf is not None:
         lf = lf.join(users_slice_lf, on=USER_COL, how="semi")
 

@@ -2,30 +2,28 @@ defaults:
   - recbole
 
 name: dssm
+
+# DSSM — не последовательная модель
+is_sequential: false
+
 params:
-  # Common DSSM hyperparameters
+  # базовые гиперпараметры DSSM (RecBole применит при сборке модели)
   embedding_size: 128
+  dropout_prob: 0.2
+
+  # обучение/валидация
   learning_rate: 0.001
   epochs: 10
-  train_batch_size: 1024
-  eval_batch_size: 1024
+  train_batch_size: 256
+  eval_batch_size: 256
 
-  # Native RecBole overrides
+  logging_level: INFO
+  eval_step: 1
+
   recbole_config:
+    eval_step: 1
     show_progress: true
-    log_level: INFO
-
-    # Use pairwise BPR with negative sampling (typical for two-tower)
-    loss_type: BPR
-    train_neg_sample_args:
-      distribution: uniform
-      sample_num: 1
-    eval_neg_sample_args:
-      distribution: uniform
-      sample_num: 100
-
-    # Optional: enable W&B
-    # log_wandb: true
-    # wandb_project: ecup-ozon
-
+    # Для внешнего стрим-лоадера отключаем негативное семплирование
+    train_neg_sample_args: null
+    eval_neg_sample_args: null
 

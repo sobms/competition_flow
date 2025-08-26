@@ -9,16 +9,35 @@ params:
   dropout_prob: 0.2
   attn_dropout_prob: 0.2
   hidden_dropout_prob: 0.2
-  max_seq_length: 50
+  max_seq_length: 40  # Уменьшено для ускорения обучения
   learning_rate: 0.001
-  epochs: 10
-  train_batch_size: 1024
-  eval_batch_size: 1024
+  epochs: 5
+  train_batch_size: 640
+  eval_batch_size: 640
+
+  logging_level: INFO
+  eval_step: 1
+  save_step: 1
   # Recbole expects no negative sampling for CE loss in SASRec
+
+  # MAX_SEQS_PER_USER: 10
+  ITEM_LIST_LENGTH_FIELD: item_length
+  MAX_ITEM_LIST_LENGTH: 40  # Соответствует max_seq_length
+  
   recbole_config:
     # log_wandb: true
     # wandb_project: ecup-ozon
     # show_progress: true
+    eval_step: 1
+    show_progress: true
     train_neg_sample_args: null
     eval_neg_sample_args: null
+    # Конфигурация валидации
+    topk: [20, 50, 100]
+    valid_metric: NDCG@100
+    eval_args:
+      group_by: user
+      order: TO
+      split: {'RS': [0.8, 0.1, 0.1]}
+      mode: labeled
 

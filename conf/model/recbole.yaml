@@ -18,10 +18,10 @@ users_dir: data/processed_features/users_features
 inter_features_dir: data/processed_features/inter_features
 
 # streaming
-stream_batch_size: 32
+stream_batch_size: 640
 stream_num_workers: 0
 
-label_type: combined
+label_type: delivered
 # optional feature columns, used only in streaming loaders
 item_feature_cols:
   - name: fclip_embed
@@ -38,17 +38,17 @@ user_feature_cols: []
 #   - name: region
 #     type: token
 inter_feature_cols:
-  - name: cnt_view_description_sum_30d_past
+  - name: cnt_view_description_sum_7d_past
     type: int
-  - name: cnt_page_view_sum_30d_past
+  - name: cnt_page_view_sum_7d_past
     type: int
-  - name: cnt_favorite_sum_30d_past
+  - name: cnt_favorite_sum_7d_past
     type: int
-  - name: cnt_unfavorite_sum_30d_past
+  - name: cnt_unfavorite_sum_7d_past
     type: int
-  - name: cnt_to_cart_sum_30d_past
+  - name: cnt_to_cart_sum_7d_past
     type: int
-  - name: cnt_remove_sum_30d_past
+  - name: cnt_remove_sum_7d_past
     type: int
-  - name: cnt_review_view_sum_30d_past
+  - name: cnt_review_view_sum_7d_past
     type: int
