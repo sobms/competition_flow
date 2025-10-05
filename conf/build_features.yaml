@@ -15,17 +15,21 @@ out_root: data/processed_features
 items_out: items_features
 users_out: users_features
 inter_out: inter_features
-shards: 1024
+shards: 256
 
 # Performance
-num_workers: 4
+num_workers: 8
+
+# Attributes features
+include_attributes: true
+attributes_min_freq_pct: 0.01  # Фильтр: атрибуты должны встречаться в >= 1% товаров
 
 # Windows for inter features (past-only)
-windows: [7d, 30d]
+windows: [14d, 7d, 1d]
 
 # Target config
 target:
-  type: combined   # delivered | combined
+  type: delivered   # delivered | combined
   horizon_days: 0  # 0 = unlimited
   drop_duplicate_targets: true
 

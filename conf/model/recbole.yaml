@@ -18,10 +18,10 @@ users_dir: data/processed_features/users_features
 inter_features_dir: data/processed_features/inter_features
 
 # streaming
-stream_batch_size: 32
+stream_batch_size: 640
 stream_num_workers: 0
 
-label_type: combined
+label_type: delivered
 # optional feature columns, used only in streaming loaders
 base_cols:
   - name: user_id
