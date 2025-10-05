@@ -23,6 +23,16 @@ stream_num_workers: 0
 
 label_type: combined
 # optional feature columns, used only in streaming loaders
+base_cols:
+  - name: user_id
+    type: token
+  - name: item_id
+    type: token
+  - name: target
+    type: float
+  - name: date
+    type: float
+
 item_feature_cols:
   - name: fclip_embed
     type: float_seq
@@ -32,23 +42,31 @@ item_feature_cols:
     type: token
   - name: model_id
     type: token
+
 user_feature_cols: []
 #   - name: age
 #     type: int
 #   - name: region
 #     type: token
+
 inter_feature_cols:
   - name: cnt_view_description_sum_30d_past
-    type: int
+    type: float
   - name: cnt_page_view_sum_30d_past
-    type: int
+    type: float
   - name: cnt_favorite_sum_30d_past
-    type: int
+    type: float
   - name: cnt_unfavorite_sum_30d_past
-    type: int
+    type: float
   - name: cnt_to_cart_sum_30d_past
-    type: int
+    type: float
   - name: cnt_remove_sum_30d_past
-    type: int
+    type: float
   - name: cnt_review_view_sum_30d_past
-    type: int
+    type: float
+
+auxiliary_feature_cols:
+  - name: item_id_list
+    type: float_seq
+  - name: item_length
+    type: float
